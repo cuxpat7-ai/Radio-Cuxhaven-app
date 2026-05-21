@@ -1,0 +1,53 @@
+name: Build APK from ZIP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ZIP entpacken
+        run: |
+          set -e
+          ZIP=$(ls *.zip 2>/dev/null | head -1)
+          if [ -z "$ZIP" ]; then
+            echo "Keine ZIP gefunden!"
+            ls -la
+            exit 1
+          fi
+          echo "Entpacke $ZIP"
+          unzip -q "$ZIP"
+          WRAPPER=$(ls -d */ 2>/dev/null | grep -v "^\.github/" | head -1)
+          if [ -n "$WRAPPER" ]; then
+            shopt -s dotglob nullglob
+            mv "$WRAPPER"* . 2>/dev/null || true
+            rmdir "$WRAPPER" 2>/dev/null || true
+          fi
+          ls -la
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: gradlew ausführbar machen
+        run: chmod +x ./gradlew
+
+      - name: Debug-APK bauen
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: APK hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: RadioCuxhaven-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+          if-no-files-found: error
