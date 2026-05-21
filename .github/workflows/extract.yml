@@ -1,0 +1,43 @@
+name: Bootstrap from ZIP
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Entpacken
+        run: |
+          set -e
+          ZIP=$(ls *.zip 2>/dev/null | head -1)
+          if [ -z "$ZIP" ]; then
+            echo "Keine ZIP gefunden – Repo evtl. schon ausgepackt"
+            exit 0
+          fi
+          echo "Entpacke $ZIP"
+          unzip -q "$ZIP"
+          WRAPPER=$(ls -d */ 2>/dev/null | grep -v "^\.github/" | head -1)
+          if [ -n "$WRAPPER" ]; then
+            shopt -s dotglob nullglob
+            mv "$WRAPPER"* . 2>/dev/null || true
+            rmdir "$WRAPPER" 2>/dev/null || true
+          fi
+          rm -f "$ZIP"
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nichts zu committen"
+          else
+            git commit -m "Projekt aus ZIP entpackt"
+            git push
+          fi
